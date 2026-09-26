@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EEE Attendance Tracker</title>
+  <style>
+    :root {
+      --bg: #121214;
+      --card-bg: #1c1c20;
+      --border: #2e2e34;
+      --text: #f0f0f2;
+      --muted: #9ba1a6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --accent: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; max-width: 1100px; margin: auto; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    
+    /* Overview Cards */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; position: relative; }
+    .card-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; color: #fff; line-height: 1.3; }
+    .card-stats { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+    .badge { font-size: 0.82rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; display: inline-block; }
+    .safe { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+    .shortage { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+    .card-footer { font-size: 0.8rem; margin-top: 10px; font-weight: 600; }
+
+    /* Dashboard Layout */
+    .dashboard { display: grid; grid-template-columns: 340px 1fr; gap: 24px; margin-bottom: 24px; }
+    @media (max-width: 850px) { .dashboard { grid-template-columns: 1fr; } }
+
+    /* Form Panel */
+    .form-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; height: fit-content; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    select, input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: #26262c; color: var(--text); font-size: 0.9rem; }
+    .btn-row { display: flex; gap: 10px; }
+    button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-present { background: var(--green); color: #000; }
+    .btn-absent { background: var(--red); color: #fff; }
+    .btn-reset { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .btn-reset:hover { border-color: var(--red); color: var(--red); }
+    button:hover { opacity: 0.85; }
+
+    /* Calendar Panel */
+    .calendar-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+    .day-name { font-size: 0.75rem; color: var(--muted); font-weight: 600; padding-bottom: 8px; }
+    .day-cell { min-height: 90px; border: 1px solid var(--border); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; align-items: flex-start; font-size: 0.8rem; background: #18181c; position: relative; }
+    .day-cell.empty { background: transparent; border-color: transparent; }
+    .day-header { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .day-num { font-weight: 600; font-size: 0.8rem; }
+    .day-count { font-size: 0.65rem; background: #26262c; color: var(--muted); border-radius: 10px; padding: 1px 5px; font-weight: 600; }
+    
+    .dots-container { display: flex; flex-direction: column; gap: 4px; width: 100%; overflow-y: auto; max-height: 80px; }
+    .dot-entry { font-size: 0.68rem; border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+    .dot-entry.p { background: rgba(34, 197, 94, 0.2); color: var(--green); border-left: 3px solid var(--green); }
+    .dot-entry.a { background: rgba(239, 68, 68, 0.2); color: var(--red); border-left: 3px solid var(--red); }
+    .del-btn { background: none; border: none; color: #fff; opacity: 0.6; cursor: pointer; padding: 0 2px; font-size: 0.75rem; flex: 0; line-height: 1; }
+    .del-btn:hover { opacity: 1; color: var(--red); }
+
+    /* Recent Log Table */
+    .table-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 12px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+    .action-del { background: transparent; border: 1px solid var(--red); color: var(--red); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; flex: 0; }
+    .action-del:hover { background: var(--red); color: #fff; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>EEE Attendance Tracker</h1>
+    <button class="btn-reset" onclick="clearAllData()">🗑️ Clear Cache & Reset</button>
+  </header>
+
+  <!-- Overview Cards -->
+  <div class="cards-grid" id="cardsContainer"></div>
+
+  <!-- Dashboard Grid -->
+  <div class="dashboard">
+    <!-- Log Form -->
+    <div class="form-panel">
+      <h2 style="font-size: 1.1rem; margin-bottom: 16px;">Log Daily Class</h2>
+      <div class="form-group">
+        <label>Subject</label>
+        <select id="subSelect">
+          <option value="EE207">EE207 - Electromagnetic Theory</option>
+          <option value="EE256">EE256 - Signals And Systems</option>
+          <option value="EE213">EE213 - Induction Motors & Transformers</option>
+          <option value="EE226">EE226 - Analog Electronic Circuits</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="btn-row">
+        <button class="btn-present" onclick="addEntry('Present')">🟢 Present</button>
+        <button class="btn-absent" onclick="addEntry('Absent')">🔴 Absent</button>
+      </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div class="calendar-panel">
+      <div class="calendar-header">
+        <button onclick="changeMonth(-1)" style="flex:0; padding: 6px 12px; background:#26262c; color:#fff;">◀</button>
+        <span id="monthYearLabel" style="font-weight: 600;"></span>
+        <button onclick="changeMonth(1)" style="flex:0; padding: 6px 12px; background:#26262c; color:#fff;">▶</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+  </div>
+
+  <!-- Detailed Entries Log -->
+  <div class="table-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="font-size: 1.1rem;">Logged Entries (Post Sept 25)</h2>
+      <span id="totalLoggedCount" style="font-size: 0.85rem; color: var(--muted);">0 total entries</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Subject</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="entriesTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // Hardcoded Fixed Baselines before Sept 25
+    const baselines = {
+      "EE207": { name: "EE207 - Electromagnetic Theory", att: 22, tot: 29 },
+      "EE256": { name: "EE256 - Signals And Systems", att: 23, tot: 29 },
+      "EE213": { name: "EE213 - Induction Motors and Transformers", att: 21, tot: 29 },
+      "EE226": { name: "EE226 - Analog Electronic Circuits", att: 26, tot: 37 }
+    };
+
+    // Switched to clean v2 storage key to drop old buggy test data
+    let entries = JSON.parse(localStorage.getItem("attendance_entries_v2")) || [];
+    let currentCalDate = new Date();
+
+    document.getElementById("dateInput").valueAsDate = new Date();
+
+    function clearAllData() {
+      if (confirm("Reset and wipe all logged entries back to the clean baseline?")) {
+        localStorage.removeItem("attendance_entries_v2");
+        localStorage.removeItem("attendance_entries");
+        entries = [];
+        saveAndRender();
+      }
+    }
+
+    function saveAndRender() {
+      localStorage.setItem("attendance_entries_v2", JSON.stringify(entries));
+      renderOverview();
+      renderCalendar();
+      renderTable();
+    }
+
+    function addEntry(status) {
+      const sub = document.getElementById("subSelect").value;
+      const date = document.getElementById("dateInput").value;
+      if (!date) return alert("Select a date!");
+
+      entries.push({ id: Date.now(), sub, date, status });
+      saveAndRender();
+    }
+
+    function removeEntry(id) {
+      entries = entries.filter(e => e.id !== id);
+      saveAndRender();
+    }
+
+    function renderOverview() {
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = "";
+
+      for (let code in baselines) {
+        const base = baselines[code];
+        const subEntries = entries.filter(e => e.sub === code);
+        const newAtt = subEntries.filter(e => e.status === "Present").length;
+        const newTot = subEntries.length;
+
+        const totalAtt = base.att + newAtt;
+        const totalHeld = base.tot + newTot;
+        const pct = ((totalAtt / totalHeld) * 100).toFixed(1);
+
+        let footerText = "";
+        let isSafe = pct >= 75;
+        if (isSafe) {
+          const leaves = Math.floor((totalAtt - 0.75 * totalHeld) / 0.75);
+          footerText = `<span style="color: var(--yellow)">You have ${leaves} leave${leaves !== 1 ? 's' : ''} left</span>`;
+        } else {
+          const needed = Math.ceil((0.75 * totalHeld - totalAtt) / 0.25);
+          footerText = `<span style="color: var(--red)">You need to attend ${needed} class${needed !== 1 ? 'es' : ''} to be safe</span>`;
+        }
+
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="card-title">${base.name}</div>
+          <div class="card-stats">Classes Attended: ${totalAtt} out of ${totalHeld}</div>
+          <div class="badge ${isSafe ? 'safe' : 'shortage'}">${pct}% ${isSafe ? 'Safe' : 'Shortage'}</div>
+          <div class="card-footer">${footerText}</div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function renderCalendar() {
+      const grid = document.getElementById("calendarGrid");
+      grid.innerHTML = "";
+      const year = currentCalDate.getFullYear();
+      const month = currentCalDate.getMonth();
+
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      document.getElementById("monthYearLabel").innerText = `${monthNames[month]} ${year}`;
+
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      days.forEach(d => grid.innerHTML += `<div class="day-name">${d}</div>`);
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        grid.innerHTML += `<div class="day-cell empty"></div>`;
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dayEntries = entries.filter(e => e.date === dateStr);
+        const countBadge = dayEntries.length > 0 ? `<span class="day-count">${dayEntries.length} logged</span>` : "";
+
+        let dotsHtml = dayEntries.map(e => `
+          <div class="dot-entry ${e.status === 'Present' ? 'p' : 'a'}">
+            <span>${e.status === 'Present' ? '🟢' : '🔴'} ${e.sub}</span>
+            <button class="del-btn" title="Delete" onclick="removeEntry(${e.id})">✕</button>
+          </div>
+        `).join("");
+
+        grid.innerHTML += `
+          <div class="day-cell">
+            <div class="day-header">
+              <span class="day-num">${d}</span>
+              ${countBadge}
+            </div>
+            <div class="dots-container">${dotsHtml}</div>
+          </div>
+        `;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("entriesTableBody");
+      const counter = document.getElementById("totalLoggedCount");
+      tbody.innerHTML = "";
+      counter.innerText = `${entries.length} total entries`;
+
+      if (entries.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color: var(--muted); text-align: center; padding: 20px;">No entries logged yet. Add one above!</td></tr>`;
+        return;
+      }
+
+      const sortedEntries = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+      sortedEntries.forEach(e => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${e.date}</td>
+          <td>${baselines[e.sub].name}</td>
+          <td><span style="color: ${e.status === 'Present' ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${e.status === 'Present' ? '🟢 Present' : '🔴 Absent'}</span></td>
+          <td><button class="action-del" onclick="removeEntry(${e.id})">Delete</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function changeMonth(delta) {
+      currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    saveAndRender();
+  </script>
+</body>
+</html>
