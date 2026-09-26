@@ -69,6 +69,7 @@
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 12px; }
     th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
     th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+    .time-subtext { font-size: 0.75rem; color: var(--muted); display: block; margin-top: 2px; }
     .action-del { background: transparent; border: 1px solid var(--red); color: var(--red); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; flex: 0; }
     .action-del:hover { background: var(--red); color: #fff; }
     .sync-status { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -102,7 +103,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Date</label>
+        <label>Date of Class</label>
         <input type="date" id="dateInput">
       </div>
       <div class="btn-row">
@@ -131,9 +132,10 @@
     <table>
       <thead>
         <tr>
-          <th>Date</th>
+          <th>Class Date</th>
           <th>Subject</th>
           <th>Status</th>
+          <th>Logged At</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -146,7 +148,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-    // Your exact Firebase Realtime Database URL
     const FIREBASE_DB_URL = "https://attendance-sync-80134-default-rtdb.firebaseio.com";
 
     const baselines = {
@@ -160,11 +161,9 @@
     let currentCalDate = new Date();
     document.getElementById("dateInput").valueAsDate = new Date();
 
-    // Initialize Firebase Realtime Database
     firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
     const dbRef = firebase.database().ref("attendance_records");
 
-    // Realtime listener: auto-syncs across laptop and mobile instantly
     dbRef.on("value", (snapshot) => {
       const val = snapshot.val();
       entries = val ? Object.entries(val).map(([id, data]) => ({ id, ...data })) : [];
@@ -176,7 +175,10 @@
       const date = document.getElementById("dateInput").value;
       if (!date) return alert("Select a date!");
 
-      dbRef.push({ sub, date, status });
+      // Stores exact timestamp in ISO format
+      const createdAt = new Date().toISOString();
+
+      dbRef.push({ sub, date, status, createdAt });
     }
 
     function removeEntry(id) {
@@ -270,6 +272,14 @@
       }
     }
 
+    function formatTimestamp(isoStr) {
+      if (!isoStr) return '<span style="color: var(--muted);">Prior entry</span>';
+      const d = new Date(isoStr);
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + 
+             ' at ' + 
+             d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
     function renderTable() {
       const tbody = document.getElementById("entriesTableBody");
       const counter = document.getElementById("totalLoggedCount");
@@ -277,17 +287,24 @@
       counter.innerText = `${entries.length} total entries`;
 
       if (entries.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="color: var(--muted); text-align: center; padding: 20px;">No entries logged yet. Add one above!</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="color: var(--muted); text-align: center; padding: 20px;">No entries logged yet. Add one above!</td></tr>`;
         return;
       }
 
-      const sortedEntries = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+      // Sort newest logged entries first
+      const sortedEntries = [...entries].sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.date).getTime();
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.date).getTime();
+        return timeB - timeA;
+      });
+
       sortedEntries.forEach(e => {
         const row = document.createElement("tr");
         row.innerHTML = `
           <td>${e.date}</td>
           <td>${baselines[e.sub].name}</td>
           <td><span style="color: ${e.status === 'Present' ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${e.status === 'Present' ? '🟢 Present' : '🔴 Absent'}</span></td>
+          <td style="font-size: 0.8rem; color: var(--muted);">${formatTimestamp(e.createdAt)}</td>
           <td><button class="action-del" onclick="removeEntry('${e.id}')">Delete</button></td>
         `;
         tbody.appendChild(row);
