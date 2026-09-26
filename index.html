@@ -44,8 +44,6 @@
     button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
     .btn-present { background: var(--green); color: #000; }
     .btn-absent { background: var(--red); color: #fff; }
-    .btn-reset { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-    .btn-reset:hover { border-color: var(--red); color: var(--red); }
     button:hover { opacity: 0.85; }
 
     /* Calendar Panel */
@@ -73,13 +71,17 @@
     th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
     .action-del { background: transparent; border: 1px solid var(--red); color: var(--red); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; flex: 0; }
     .action-del:hover { background: var(--red); color: #fff; }
+    .sync-status { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
   </style>
 </head>
 <body>
 
   <header>
     <h1>EEE Attendance Tracker</h1>
-    <button class="btn-reset" onclick="clearAllData()">🗑️ Clear Cache & Reset</button>
+    <div class="sync-status">
+      <span class="sync-dot"></span> Live Sync Connected
+    </div>
   </header>
 
   <!-- Overview Cards -->
@@ -139,8 +141,14 @@
     </table>
   </div>
 
+  <!-- Firebase SDK Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <script>
-    // Hardcoded Fixed Baselines before Sept 25
+    // Your exact Firebase Realtime Database URL
+    const FIREBASE_DB_URL = "https://attendance-sync-80134-default-rtdb.firebaseio.com";
+
     const baselines = {
       "EE207": { name: "EE207 - Electromagnetic Theory", att: 22, tot: 29 },
       "EE256": { name: "EE256 - Signals And Systems", att: 23, tot: 29 },
@@ -148,40 +156,39 @@
       "EE226": { name: "EE226 - Analog Electronic Circuits", att: 26, tot: 37 }
     };
 
-    // Switched to clean v2 storage key to drop old buggy test data
-    let entries = JSON.parse(localStorage.getItem("attendance_entries_v2")) || [];
+    let entries = [];
     let currentCalDate = new Date();
-
     document.getElementById("dateInput").valueAsDate = new Date();
 
-    function clearAllData() {
-      if (confirm("Reset and wipe all logged entries back to the clean baseline?")) {
-        localStorage.removeItem("attendance_entries_v2");
-        localStorage.removeItem("attendance_entries");
-        entries = [];
-        saveAndRender();
-      }
-    }
+    // Initialize Firebase Realtime Database
+    firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+    const dbRef = firebase.database().ref("attendance_records");
 
-    function saveAndRender() {
-      localStorage.setItem("attendance_entries_v2", JSON.stringify(entries));
-      renderOverview();
-      renderCalendar();
-      renderTable();
-    }
+    // Realtime listener: auto-syncs across laptop and mobile instantly
+    dbRef.on("value", (snapshot) => {
+      const val = snapshot.val();
+      entries = val ? Object.entries(val).map(([id, data]) => ({ id, ...data })) : [];
+      renderAll();
+    });
 
     function addEntry(status) {
       const sub = document.getElementById("subSelect").value;
       const date = document.getElementById("dateInput").value;
       if (!date) return alert("Select a date!");
 
-      entries.push({ id: Date.now(), sub, date, status });
-      saveAndRender();
+      dbRef.push({ sub, date, status });
     }
 
     function removeEntry(id) {
-      entries = entries.filter(e => e.id !== id);
-      saveAndRender();
+      if (confirm("Delete this entry?")) {
+        dbRef.child(id).remove();
+      }
+    }
+
+    function renderAll() {
+      renderOverview();
+      renderCalendar();
+      renderTable();
     }
 
     function renderOverview() {
@@ -247,7 +254,7 @@
         let dotsHtml = dayEntries.map(e => `
           <div class="dot-entry ${e.status === 'Present' ? 'p' : 'a'}">
             <span>${e.status === 'Present' ? '🟢' : '🔴'} ${e.sub}</span>
-            <button class="del-btn" title="Delete" onclick="removeEntry(${e.id})">✕</button>
+            <button class="del-btn" title="Delete" onclick="removeEntry('${e.id}')">✕</button>
           </div>
         `).join("");
 
@@ -281,7 +288,7 @@
           <td>${e.date}</td>
           <td>${baselines[e.sub].name}</td>
           <td><span style="color: ${e.status === 'Present' ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${e.status === 'Present' ? '🟢 Present' : '🔴 Absent'}</span></td>
-          <td><button class="action-del" onclick="removeEntry(${e.id})">Delete</button></td>
+          <td><button class="action-del" onclick="removeEntry('${e.id}')">Delete</button></td>
         `;
         tbody.appendChild(row);
       });
@@ -291,8 +298,6 @@
       currentCalDate.setMonth(currentCalDate.getMonth() + delta);
       renderCalendar();
     }
-
-    saveAndRender();
   </script>
 </body>
 </html>
